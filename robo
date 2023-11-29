@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+import rospy
+import math
+from geometry_msgs.msg import Twist
+from geometry_msgs.msg import PoseStamped
+
+# 初始化ROS节点
+rospy.init_node('robot_mover')
+
+# 创建速度指令的发布者
+cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
+
+# 假设的初始位置和地图大小
+current_position = [9, 9]
+map_size = 9
+
+# 定义移动指令
+def move_to_target(current_pos, target_pos):
+    twist = Twist()
+    dx, dy = target_pos[0] - current_pos[0], target_pos[1] - current_pos[1]
+
+    # 确定机器人需要移动的方向
+    if dx != 0:
+        twist.linear.x = 0.1 * math.copysign(1, dx)  # 根据dx的符号确定前进或后退
+    elif dy != 0:
+        twist.angular.z = 0.1 * math.copysign(1, dy) # 根据dy的符号确定左转或右转
+
+    return twist
+
+# 读取目标位置
+def get_next_target():
+    # 这里你可以添加读取下一个目标点的代码
+    # 例如从文件、用户输入或其他方式获取
+    return [8, 9]  # 示例目标位置
+
+# 控制机器人移动到下一个目标点
+def move_robot():
+    target_position = get_next_target()
+    while current_position != target_position:
+        twist = move_to_target(current_position, target_position)
+        cmd_pub.publish(twist)
+        rospy.sleep(1)  # 等待一秒以模拟移动
+
+        # 更新当前位置
+        # 这里你需要添加代码来实际更新机器人的位置
+        # 例如，基于传感器数据或假设机器人已成功移动一步
+        current_position[0] += math.copysign(1, twist.linear.x)
+        current_position[1] += math.copysign(1, twist.angular.z)
+
+# 运行主函数
+if __name__ == '__main__':
+    try:
+        move_robot()
+    except rospy.ROSInterruptException:
+        pass
