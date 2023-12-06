@@ -20,18 +20,15 @@ def check_goal_reached(cur_x, cur_y, goal_x, goal_y, bias):
 
 
 # 控制机器人移动到下一个目标点
-def move_robot(init_position, target_position, off_set_x, off_set_y, magnitute):
+def move_robot(init_position, target_position, off_set_x, off_set_y):
     for target_pos in target_position:
         init_pose = rospy.wait_for_message('/id701/aruco_single/pose', PoseStamped)
-        current_position[0] = init_pose.pose.position.x - off_set_x
-        current_position[1] = init_pose.pose.position.y - off_set_y
-        target_x = (target_pos[0] - init_position[0]) * magnitute
-        target_y = (target_pos[1] - init_position[1]) * magnitute  ---- magnitute y?
-        -----------------twist weizhi ------------
-        while not check_goal_reached(current_x, current_y, target_x, target_y, 0.05):
+        cur_x = init_pose.pose.position.x
+        cur_y = init_pose.pose.position.y
+        target_x = (target_pos[0] - 5) * off_set_x
+        target_y = (target_pos[1] - 5) * off_set_y
+        while not check_goal_reached(cur_x, cur_y, target_x, target_y, 0.05):
             init_pose = rospy.wait_for_message('/id701/aruco_single/pose', PoseStamped)
-            cur_x = init_pose.pose.position.x - off_set_x
-            cru_y = init_pose.pose.position.y - off_set_y
 
             orientation_q = init_pose.pose.orientation
             orientation_list = [orientation_q.x, orientation_q.y, orientation_q.z, orientation_q.w]
@@ -43,8 +40,8 @@ def move_robot(init_position, target_position, off_set_x, off_set_y, magnitute):
             distance = math.dist([cur_x, cur_y],[target_x, target_y])
             goal_direct = math.atan2(dy,dx)
 
-            print("init_pose", [init_pose.pose.position.x, init_pose.pose.position.y])
-            print("goal_pose", [goal_pose.pose.position.x, goal_pose.pose.position.y])
+            print("init_pose", [cur_x, cur_y])
+            print("goal_pose", [target_x, target_y])
             print("Orientation", Orientation)
             print("goal_direct", goal_direct)
 
@@ -67,31 +64,31 @@ def move_robot(init_position, target_position, off_set_x, off_set_y, magnitute):
             angular = k2 * theta
             twist.linear.x = linear * distance * math.cos(theta)
             twist.angular.z = -angular
-            cmd_pub.publish(twist)
-                    
+            cmd_pub.publish(twist)     
 
 def main(agent_number):
     rospy.init_node('robot_mover')
+    global cmd_pub
     cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
 
-    init_position = [9, 9]
-    magnitute = 1
-
     init_pose = rospy.wait_for_message('/id701/aruco_single/pose', PoseStamped)
-    off_set_x = init_pose.pose.position.x
-    off_set_y = init_pose.pose.position.y
 
-    if agent_number == 1:
-        target_position = []
+    if agent_number == ‘1’:
+        init_position = [9,9]
+        target_position = [[8,9],[7,9],[7,8],[7,7],[8,7],[8,6],[8,5],[7,5],[7,4],[7,3],[6,3],[5,3],[4,3],[3,3],[3,2],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[8,0]]
+        off_set_x = abs(init_pose.pose.position.x/4)
+        off_set_y = abs(init_pose.pose.position.y/4)
     else:
-        target_position = []
+        init_position = [0,9]
+        target_position = [[0,9],[1,9],[2,9],[2,8],[2,7],[3,7],[4,7],[4,6],[4,5],[3,5],[2,5],[2,4],[2,3],[2,3],[3,3],[3,2],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[9,1],[9,0]]
+        off_set_x = abs(init_pose.pose.position.x/5)
+        off_set_y = abs(init_pose.pose.position.y/4)
+    #target_position = [[8,9],[7,9],[7,8],[7,7],[8,7],[8,6],[8,5],[7,5],[7,4],[7,3],[6,3],[5,3],[4,3],[3,3],[3,2],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[8,0]]
 
-    move_robot([0,0], [[1,0]], off_set_x, off_set_y, magnitute=1)
-    init_pose = rospy.wait_for_message('/id701/aruco_single/pose', PoseStamped)
-    magnitute = (init_pose.pose.position.x - off_set_x)/1
-    move_robot([0,0], [[-1,0]], off_set_x, off_set_y, magnitute=1)
-
-    move_robot(init_position, target_position, off_set_x, off_set_y, magnitute)
+    global twist
+    twist = Twist()
+    
+    move_robot(init_position, target_position, off_set_x, off_set_y)
 
 
 if __name__ == "__main__":
@@ -99,4 +96,4 @@ if __name__ == "__main__":
     parser.add_argument("agent", help="agnet number")
     #parser.add_argument("output", help="output file with the schedule")
     args = parser.parse_args()
-    main(agent)
+    main(args.agent)
