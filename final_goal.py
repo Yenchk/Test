@@ -4,11 +4,13 @@ import argparse
 import rospy
 import math
 import actionlib
+import cv2
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import PoseStamped
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 from nav_msgs.msg import Odometry
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+
 
 
 def check_goal_reached(cur_x, cur_y, goal_x, goal_y, bias):
@@ -26,7 +28,7 @@ def move_robot(init_position, target_position, off_set_x, off_set_y):
         cur_x = init_pose.pose.position.x
         cur_y = init_pose.pose.position.y
         target_x = (target_pos[0] - 5) * off_set_x
-        target_y = (target_pos[1] - 5) * off_set_y
+        target_y = (target_pos[1] + 5) * off_set_y
         while not check_goal_reached(cur_x, cur_y, target_x, target_y, 0.05):
             init_pose = rospy.wait_for_message('/id701/aruco_single/pose', PoseStamped)
 
@@ -66,13 +68,39 @@ def move_robot(init_position, target_position, off_set_x, off_set_y):
             twist.angular.z = -angular
             cmd_pub.publish(twist)     
 
+# TODO: Use this function to convert simulation points to real camera coordinates
+def convert_sim_to_real_pose(point, matrix):
+    point = np.array([point['x'], point['y'], 1])
+    print(f'sim point {point}')
+    transformed_point = np.dot(matrix, point)
+    transformed_point = transformed_point / transformed_point[2]
+    print(f'real pose {transformed_point}')
+    return {'x': transformed_point[0], 'y': transformed_point[1]}
+
 def main(agent_number):
     rospy.init_node('robot_mover')
     global cmd_pub
     cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
 
-    init_pose = rospy.wait_for_message('/id701/aruco_single/pose', PoseStamped)
+    ### Define your points in the simulation plane and the real-world plane
+    pose_tl = rospy.wait_for_message('/id500/aruco_single/pose', PoseStamped)
+    pose_tr = rospy.wait_for_message('/id501/aruco_single/pose', PoseStamped)
+    pose_br = rospy.wait_for_message('/id502/aruco_single/pose', PoseStamped)
+    pose_bl = rospy.wait_for_message('/id503/aruco_single/pose', PoseStamped)
+    print(f'tl x={pose_tl.pose.position.x} y={pose_tl.pose.position.y}')
+    print(f'tr x={pose_tr.pose.position.x} y={pose_tr.pose.position.y}')
+    print(f'br x={pose_br.pose.position.x} y={pose_br.pose.position.y}')
+    print(f'bl x={pose_bl.pose.position.x} y={pose_bl.pose.position.y}')
 
+    real_points = np.float32([[pose_bl.pose.position.x, pose_bl.pose.position.y], 
+                         [pose_br.pose.position.x, pose_br.pose.position.y], 
+                         [pose_tl.pose.position.x, pose_tl.pose.position.y], 
+                         [pose_tr.pose.position.x, pose_tr.pose.position.y]])
+    sim_points = np.float32([[0, 0], [10, 0], [0, 10], [10, 10]])
+
+    ### Calculate the perspective transformation matrix
+    matrix = cv2.getPerspectiveTransform(sim_points, real_points)
+    
     if agent_number == ‘1’:
         init_position = [9,9]
         target_position = [[8,9],[7,9],[7,8],[7,7],[8,7],[8,6],[8,5],[7,5],[7,4],[7,3],[6,3],[5,3],[4,3],[3,3],[3,2],[3,1],[4,1],[5,1],[6,1],[7,1],[8,1],[8,0]]
